@@ -72,11 +72,6 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
      */
     public void setAdapter(RecyclerView.Adapter<RecyclerView.ViewHolder> adapter) {
 
-        if (adapter != null) {
-            if (!(adapter instanceof RecyclerView.Adapter))
-                throw new RuntimeException("your adapter must be a RecyclerView.Adapter");
-        }
-
         if (mInnerAdapter != null) {
             notifyItemRangeRemoved(getHeaderViewsCount(), mInnerAdapter.getItemCount());
             mInnerAdapter.unregisterAdapterDataObserver(mDataObserver);
@@ -94,7 +89,7 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
     public void addHeaderView(View header) {
 
         if (header == null) {
-            throw new RuntimeException("header is null");
+            throw new RuntimeException("header is null, not supported");
         }
 
         mHeaderViews.add(header);
@@ -104,7 +99,7 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
     public void addFooterView(View footer) {
 
         if (footer == null) {
-            throw new RuntimeException("footer is null");
+            throw new RuntimeException("footer is null, not supported");
         }
 
         mFooterViews.add(footer);
@@ -112,7 +107,7 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
     }
 
     /**
-     * 返回第一个FoView
+     * 返回第一个FooterView
      * @return
      */
     public View getFooterView() {
@@ -187,18 +182,20 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
     @Override
     public int getItemViewType(int position) {
         int innerCount = mInnerAdapter.getItemCount();
-        int headerViewsCountCount = getHeaderViewsCount();
-        if (position < headerViewsCountCount) {
+        int headerViewsCount = getHeaderViewsCount();
+        if (position < headerViewsCount) {
+            //position 小于 header 总数
             return TYPE_HEADER_VIEW + position;
-        } else if (headerViewsCountCount <= position && position < headerViewsCountCount + innerCount) {
-
-            int innerItemViewType = mInnerAdapter.getItemViewType(position - headerViewsCountCount);
+        } else if (headerViewsCount <= position && position < headerViewsCount + innerCount) {
+            //大于 headerCount 小于 headerCount+innerCount
+            int innerItemViewType = mInnerAdapter.getItemViewType(position - headerViewsCount);
             if(innerItemViewType >= Integer.MAX_VALUE / 2) {
                 throw new IllegalArgumentException("your adapter's return value of getViewTypeCount() must < Integer.MAX_VALUE / 2");
             }
             return innerItemViewType + Integer.MAX_VALUE / 2;
         } else {
-            return TYPE_FOOTER_VIEW + position - headerViewsCountCount - innerCount;
+            //剩下是 footer 的count
+            return TYPE_FOOTER_VIEW + position - headerViewsCount - innerCount;
         }
     }
 
