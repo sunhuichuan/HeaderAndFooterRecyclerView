@@ -14,8 +14,22 @@ import java.util.ArrayList;
  */
 public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-    private static final int TYPE_HEADER_VIEW = Integer.MIN_VALUE;
-    private static final int TYPE_FOOTER_VIEW = Integer.MIN_VALUE + 1;
+    /**
+     * HeaderView类型总和的上限
+     */
+    private static final int TYPE_HEADER_VIEW_MAX = 999;
+    /**
+     * HeaderView 的基数值
+     */
+    private static final int TYPE_HEADER_VIEW_BASE = Integer.MIN_VALUE;
+    /**
+     * FooterView 的基数值
+     */
+    private static final int TYPE_FOOTER_VIEW_BASE = TYPE_HEADER_VIEW_MAX + 1;
+    /**
+     * InnerAdapter ViewType 的起始基数值
+     */
+    private static final int TYPE_INNER_ADAPTER_VIEW_BASE = Integer.MAX_VALUE / 2;
 
     /**
      * RecyclerView使用的，真正的Adapter
@@ -68,6 +82,7 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
 
     /**
      * 设置adapter
+     *
      * @param adapter
      */
     public void setAdapter(RecyclerView.Adapter<RecyclerView.ViewHolder> adapter) {
@@ -91,6 +106,9 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
         if (header == null) {
             throw new RuntimeException("header is null, not supported");
         }
+        if (mHeaderViews.size() == TYPE_HEADER_VIEW_MAX) {
+            throw new RuntimeException("your HeaderView count must < " + TYPE_HEADER_VIEW_MAX);
+        }
 
         mHeaderViews.add(header);
         this.notifyDataSetChanged();
@@ -108,18 +126,20 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
 
     /**
      * 返回第一个FooterView
+     *
      * @return
      */
     public View getFooterView() {
-        return  getFooterViewsCount()>0 ? mFooterViews.get(0) : null;
+        return getFooterViewsCount() > 0 ? mFooterViews.get(0) : null;
     }
 
     /**
      * 返回第一个HeaderView
+     *
      * @return
      */
     public View getHeaderView() {
-        return  getHeaderViewsCount()>0 ? mHeaderViews.get(0) : null;
+        return getHeaderViewsCount() > 0 ? mHeaderViews.get(0) : null;
     }
 
     public void removeHeaderView(View view) {
@@ -152,23 +172,29 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         int headerViewsCountCount = getHeaderViewsCount();
-        if (viewType < TYPE_HEADER_VIEW + headerViewsCountCount) {
-            return new ViewHolder(mHeaderViews.get(viewType - TYPE_HEADER_VIEW));
-        } else if (viewType >= TYPE_FOOTER_VIEW && viewType < Integer.MAX_VALUE / 2) {
-            return new ViewHolder(mFooterViews.get(viewType - TYPE_FOOTER_VIEW));
-        } else {
-            return mInnerAdapter.onCreateViewHolder(parent, viewType - Integer.MAX_VALUE / 2);
+        if (viewType < TYPE_HEADER_VIEW_BASE + headerViewsCountCount) {
+            //viewType是HeaderView
+            return new ViewHolder(mHeaderViews.get(viewType - TYPE_HEADER_VIEW_BASE));
+        } else if (viewType >= TYPE_INNER_ADAPTER_VIEW_BASE) {
+            //innerAdapter 的 viewType是从 Integer.MAX_VALUE / 2 开始的
+            int realViewType = viewType - TYPE_INNER_ADAPTER_VIEW_BASE;
+            return mInnerAdapter.onCreateViewHolder(parent, realViewType);
+        } else{
+            //viewType是FooterView
+            return new ViewHolder(mFooterViews.get(viewType - TYPE_FOOTER_VIEW_BASE));
         }
     }
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+        //bindViewHolder，刷新ViewHolder中的内容
         int headerViewsCountCount = getHeaderViewsCount();
         if (position >= headerViewsCountCount && position < headerViewsCountCount + mInnerAdapter.getItemCount()) {
+            //position在innerAdapter范围
             mInnerAdapter.onBindViewHolder(holder, position - headerViewsCountCount);
         } else {
             ViewGroup.LayoutParams layoutParams = holder.itemView.getLayoutParams();
-            if(layoutParams instanceof StaggeredGridLayoutManager.LayoutParams) {
+            if (layoutParams instanceof StaggeredGridLayoutManager.LayoutParams) {
                 ((StaggeredGridLayoutManager.LayoutParams) layoutParams).setFullSpan(true);
             }
         }
@@ -185,17 +211,17 @@ public class HeaderAndFooterRecyclerViewAdapter extends RecyclerView.Adapter<Rec
         int headerViewsCount = getHeaderViewsCount();
         if (position < headerViewsCount) {
             //position 小于 header 总数
-            return TYPE_HEADER_VIEW + position;
-        } else if (headerViewsCount <= position && position < headerViewsCount + innerCount) {
-            //大于 headerCount 小于 headerCount+innerCount
-            int innerItemViewType = mInnerAdapter.getItemViewType(position - headerViewsCount);
-            if(innerItemViewType >= Integer.MAX_VALUE / 2) {
-                throw new IllegalArgumentException("your adapter's return value of getViewTypeCount() must < Integer.MAX_VALUE / 2");
-            }
-            return innerItemViewType + Integer.MAX_VALUE / 2;
+            return TYPE_HEADER_VIEW_BASE + position;
+        } else if (position >= (headerViewsCount + innerCount)) {
+            //position > (headViewCount + innerAdapterCount) ,被视为 footer类型
+            return TYPE_FOOTER_VIEW_BASE + position - headerViewsCount - innerCount;
         } else {
-            //剩下是 footer 的count
-            return TYPE_FOOTER_VIEW + position - headerViewsCount - innerCount;
+            //其他都是 innerAdapter 的类型
+            int innerItemViewType = mInnerAdapter.getItemViewType(position - headerViewsCount);
+            if (innerItemViewType >= (Integer.MAX_VALUE - TYPE_INNER_ADAPTER_VIEW_BASE)) {
+                throw new IllegalArgumentException("your adapter's return value of getViewTypeCount() must < "+(Integer.MAX_VALUE - TYPE_INNER_ADAPTER_VIEW_BASE));
+            }
+            return innerItemViewType + TYPE_INNER_ADAPTER_VIEW_BASE;
         }
     }
 
